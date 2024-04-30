@@ -33,42 +33,58 @@ model Tanabe_65MN
 
   //Model Variables
   //Passive system variables
-  Real C_cb = 2.610*3600;    //core blood heat capacity [W.s/K]
-  Real arC = 1.067;          //counter-current variable
-  Real Qb = 0.778;           //basal metabolic output for whole body [met]
-  
-  Real A_Du[16] = {0.14, 0.175, 0.161, 0.221, 0.096, 0.096, 0.063, 0.063, 0.05, 0.05, 0.209, 0.209, 0.112, 0.112, 0.056, 0.056};    //local DuBois body surface area {i} [m2]
+  Real A_Du[16] = {0.14, 0.175, 0.161, 0.221, 0.096, 0.096, 0.063, 0.063, 0.05, 0.05, 0.209, 0.209, 0.112, 0.112, 0.056, 0.056};  //local DuBois body surface area {i} [m2]
 
   Real c[16,4] = {{2.576,0.386,0.258,0.282}, {2.915,5.669,1.496,0.418}, {2.471,5.022,1.322,0.386}, {6.017,7.997,2.102,0.606},
                   {0.503,1.078,0.207,0.151}, {0.503,1.078,0.207,0.151}, {0.321,0.681,0.131,0.099}, {0.321,0.681,0.131,0.099},
                   {0.082,0.037,0.052,0.099}, {0.082,0.037,0.052,0.099}, {1.665,3.604,0.560,0.423}, {1.665,3.604,0.560,0.423},
-                  {0.793,1.715,0.268,0.204}, {0.793,1.715,0.268,0.204}, {0.139,0.037,0.077,0.125}, {0.139,0.037,0.077,0.125}};    //heat capacity in each node {i,j} [W.h/K]
-  Real C[16,4];  //array used for conversion from [h]ours -> [s]econds
+                  {0.793,1.715,0.268,0.204}, {0.793,1.715,0.268,0.204}, {0.139,0.037,0.077,0.125}, {0.139,0.037,0.077,0.125}};  //heat capacity in each node {i,j} [W.h/K]
+  Real C[16,4];  //array used to convert c{i,j} from [h]ours -> [s]econds || [W.s/K]
+  Real C_cb = 2.610*3600;  //core blood heat capacity [W.s/K]
+  Real arC = 1.067;  //counter-current variable
 
   Real Q_b[16,4] = {{16.843,0.217,0.109,0.131}, {21.182,2.537,0.568,0.179}, {18.699,2.537,0.501,0.158}, {8.05,4.067,0.804,0.254},
                     {0.181,0.423,0.610,0.050}, {0.181,0.423,0.610,0.050}, {0.094,0.220,0.031,0.026}, {0.094,0.220,0.031,0.026},
                     {0.045,0.022,0.023,0.050}, {0.045,0.022,0.023,0.050}, {0.343,0.824,0.151,0.122}, {0.343,0.824,0.151,0.122},
-                    {0.102,0.220,0.035,0.023}, {0.102,0.220,0.035,0.023}, {0.122,0.035,0.056,0.100}, {0.122,0.035,0.056,0.100}};    //basal metabolic rate in each node {i,j} [W]
+                    {0.102,0.220,0.035,0.023}, {0.102,0.220,0.035,0.023}, {0.122,0.035,0.056,0.100}, {0.122,0.035,0.056,0.100}};  //basal metabolic rate in each node {i,j} [W]
+  Real Q[16,4];  //heat gain from metabolic processes in each node {i,j} [W]
+  Real Qb = 0.778;  //basal metabolic output for whole body [met]
 
   Real bfb[16,4] = {{45,0.87,0.34,2.24}, {77.85,7.66,1.34,1.8}, {76.34,7.66,1.34,1.35}, {18.19,12.28,2.16,2.08},
                      {0.320,1.280,0.160,0.860}, {0.320,1.280,0.160,0.860}, {0.160,0.670,0.085,0.450}, {0.160,0.670,0.085,0.450},
                      {0.091,0.078,0.042,0.910}, {0.091,0.078,0.042,0.910}, {0.364,0.855,0.150,0.380}, {0.364,0.855,0.150,0.380},
-                     {0.071,0.070,0.019,0.110}, {0.071,0.070,0.019,0.110}, {0.049,0.010,0.019,0.450}, {0.049,0.010,0.019,0.450}};    //basal blood flow rate in each node {i,j} [L/h]
+                     {0.071,0.070,0.019,0.110}, {0.071,0.070,0.019,0.110}, {0.049,0.010,0.019,0.450}, {0.049,0.010,0.019,0.450}};  //basal blood flow rate in each node {i,j} [L/h]
   Real BFB[16,4];  //array used to convert bfb{i,j} from [h]ours -> [s]econds || [L/s]
-  Real BF[16,4];   //actual blood flow rate in node {i,j} [L/s]
-  Real B[16,4];    //heat exchange between core blood and node {i,j} [W]
+  Real BF[16,4];  //actual blood flow rate in node {i,j} [L/s]
+  Real B[16,4];  //heat exchange between core blood and node {i,j} [W]
 
   Real C_d[16,3] = {{1.601,13.224,16.008}, {0.616,2.100,9.164}, {0.594,2.018,8.700}, {0.379,1.276,5.104},
                     {0.441,2.946,7.308}, {0.441,2.946,7.308}, {0.244,2.227,7.888}, {0.244,2.227,7.888},
                     {2.181,6.484,5.858}, {2.181,6.484,5.858}, {2.401,4.536,30.160}, {2.401,4.536,30.160},
-                    {1.891,2.656,7.540}, {1.891,2.656,7.540}, {8.12,10.266,8.178}, {8.12,10.266,8.178}};    //thermal conductance between node {i,j} and its neighbour {i,j+1} [W/K]
+                    {1.891,2.656,7.540}, {1.891,2.656,7.540}, {8.12,10.266,8.178}, {8.12,10.266,8.178}};  //thermal conductance between node {i,j} and its neighbour {i,j+1} [W/K]
   Real D[16,4];   //heat transfer in each node {i,j} due to conduction [W]
+
+  Real Q_t[16];  //sensible heat transfer with the environment at each skin segment {i} [W]
+
+  Real E_b[16];  //basal evaporative heat loss at each segment skin surface {i} [W]
+  Real esw[16];  //evaporative heat loss due to sweat at each segment skin surface {i} [W]
+  Real E_max[16];  //maximum evaporative heat loss due to sweat at each segment skin surface {i} [W]
+  Real E_sw[16];  //actual evaporative heat loss due to sweat at each segment skin surface {i} [W]
+  Real e[16];  //total evaporative heat tranfer with the environment at each skin surface {i} [W]
+  Real E[16];  //total evaporative heat tranfer with the environment at each skin surface {i} [W] (filter out non-zero values)
+
+  Real ch[16,4];  //work done in each node {i,j} by shiver [W]
+  Real C_h[16,4];  //work done in each node {i,j} by shiver [W] (filter out non-zero values)
+
+  Real w[16,4];  //work done in each node {i,j} [W]
+  Real W[16,4];  //work done in each node {i,j} [W] (filter out non-zero values)
 
   Real res;      //respiration heat transfer [W]
   Real RES[16];  //respiration in each segment {i} [W]
 
-  Real T[16,4];             //temperatures in each node {i,j} [degC]
-  Real T_cb(start = 37.11); //temperature of core blood  [degC]
+  Real T[16,4];  //temperatures in each node {i,j} [degC]
+  Real T_cb(start = 37.11);  //temperature of core blood  [degC]
+  Real T_s[17];  //skin temperature outputs in each body segment {i} plus core blood {i=17} [degC]
   Real T_init[16,4] = {{36.47, 34.6, 34.16, 33.75}, {36.27, 36.58, 34.65, 33.92}, {36.41, 36.56, 34.61, 33.85}, {36.58, 36.67, 33.68, 31.63},
                         {36.01, 35.61, 34.8, 34.36}, {36.01, 35.61, 34.8, 34.36}, {35.89, 35.47, 34.4, 34.08}, {35.88, 35.45, 34.38, 34.05},
                         {30.19, 29.9, 29.58, 29.18}, {29.92, 29.62, 29.29, 28.88}, {35.37, 35.04, 32, 31.51}, {35.29, 34.93, 31.73, 31.21},
@@ -76,10 +92,8 @@ model Tanabe_65MN
   Real T_set[16,4] = {{36.9,36.1,35.8,35.6}, {36.5,36.2,34.5,33.6}, {36.5,35.8,34.4,33.2}, {36.3,35.6,34.5,33.4},
                       {35.8,34.6,33.8,33.4}, {35.8,34.6,33.8,33.4}, {35.5,34.8,34.7,34.6}, {35.5,34.8,34.7,34.6},
                       {35.4,35.3,35.3,35.2}, {35.4,35.3,35.3,35.2}, {35.8,35.2,34.4,33.8}, {35.8,35.2,34.4,33.8},
-                      {35.6,34.4,33.9,33.4}, {35.6,34.4,33.9,33.4}, {35.1,34.9,34.4,33.9}, {35.1,34.9,34.4,33.9}};    //thermoregulation setpoint tempertures in node {i,j} [degC]
-  Real T_ave;
-  Real E_v;
-  Real T_ave2;
+                      {35.6,34.4,33.9,33.4}, {35.6,34.4,33.9,33.4}, {35.1,34.9,34.4,33.9}, {35.1,34.9,34.4,33.9}};  //thermoregulation setpoint tempertures in node {i,j} [degC]
+
 
   //Active system variables 
   //Distribution coefficients
@@ -89,10 +103,12 @@ model Tanabe_65MN
   Real SKINC[16] = {0.022, 0.065, 0.065, 0.065, 0.022, 0.022, 0.022, 0.022, 0.152, 0.152, 0.022, 0.022, 0.022, 0.022, 0.152, 0.152}; //distribution coefficient for skin vasoconstriction
   Real Chilf[16] = {0.02, 0.258, 0.227, 0.365, 0.004, 0.004, 0.026, 0.026, 0, 0, 0.023, 0.023, 0.012, 0.012, 0, 0};                  //distribution coefficient for muscle heat production (shiver)
   Real Metf[16] = {0, 0.091, 0.08, 0.129, 0.026, 0.026, 0.014, 0.014, 0.005, 0.005, 0.201, 0.201, 0.099, 0.099, 0.005, 0.005};       //distribution coefficient for muscle heat production (work)
-
+  tanabe_ctrl Core(sw=371.2,ch=0,dl=117,st=11.5)  annotation (Placement(transformation(extent={{-30,-70},{-10,-50}})));  //
+  tanabe_ctrl Skin(sw=33.6,ch=0,dl=7.5,st=11.5)   annotation (Placement(transformation(extent={{10,-70},{30,-50}})));    //
+  tanabe_ctrl P(sw=0,ch=24.4,dl=0,st=0)           annotation (Placement(transformation(extent={{50,-70},{70,-50}})));    //
+  
   //Thermoregulation variables
   Real Err[16,4];
-  Real SHIV;
   Real WRMS;
   Real CLDS;
   Real dl;
@@ -100,6 +116,12 @@ model Tanabe_65MN
   Real st;
   Real ST;
   Real RT = 10;
+  Real Wrm[16,4];
+  Real wrms[16];
+  Real Cld[16,4];
+  Real clds[16];
+  Real km[16];
+  Real RATE[16,4];
 
   //Environmental Variables
   Real RH = 70;
@@ -108,28 +130,6 @@ model Tanabe_65MN
   Real T0;
   //Real LR = 2.2; //Lewis Ratio (65MN value)
   Real LR = 16.5; //Lewis Ratio (JOS3 value)
-  Real T_a[16];
-  Real T_s[17];
-
-
-
-  
-
-
-
-
-
-  Real ch[16,4];
-  Real C_h[16,4];
-  Real Cld[16,4];
-  Real clds[16];
-  Real e[16];
-  Real E[16];
-  Real E_b[16];
-  Real esw[16];
-  Real E_sw[16];
-  Real E_max[16];
-
   Real f_cl[16];
   //Real h_c[16] = {4.0, 4.2, 3.8, 4.2, 5.2, 5.2, 5, 5, 6, 6, 4.3, 4.3, 4.1, 4.1, 6, 6};
   //Real h_r[16] = {4.6, 3.7, 4.3, 4, 4.6, 4.6, 3.9, 3.9, 4.4, 4.4, 3.8, 3.8, 4.4, 4.4, 5.9, 5.9};
@@ -139,72 +139,35 @@ model Tanabe_65MN
   Real h_t[16];
   Real h[16];
   Real i_cl[16];
-  Real km[16];
+  Real T_a[16];
   Real p_a[16];
   Real p_sks[16];
-  Real Q[16,4];
-  Real Q_t[16];
-  Real RATE[16,4];
-
-  Real t_0[16];
-  Real w[16,4];
-  Real W[16,4];
-  Real Wrm[16,4];
-  Real wrms[16];
-
-  
-  Real Mshiv[16];
-
-  Real sumQ;
-  Real sumB;
-  Real sumW;
-  Real sumCh;
-  Real sumQt;
-  Real sumE;
-  Real sumEsw;
-
-  Real T_o[16];
-
-  tanabe_ctrl Core(sw=371.2,ch=0,dl=117,st=11.5)  annotation (Placement(transformation(extent={{-30,-70},{-10,-50}})));
-  tanabe_ctrl Skin(sw=33.6,ch=0,dl=7.5,st=11.5)   annotation (Placement(transformation(extent={{10,-70},{30,-50}})));
-  tanabe_ctrl P(sw=0,ch=24.4,dl=0,st=0)           annotation (Placement(transformation(extent={{50,-70},{70,-50}})));
-
-// run 1 - start = 60
-  
-
-// run 2 - start = 240
-//  Real T_init[16,4] = { {36.530077,34.5789055,34.0849915,33.588355}, {36.324846,36.593997,34.6445165,33.7975265}, {36.482216,36.574137,34.607044,33.778338}, {36.600231,36.6844985,33.670663,31.3624265},
-//   {36.020325,35.6213725,34.755017,34.2572595}, {36.020325,35.6213725,34.755017,34.2572595}, {35.899527,35.473067,34.3341275,33.9589255}, {35.8894225,35.452642,34.279998,33.8824445},
-//   {30.168994,29.8204325,29.4748175,29.01317}, {29.895504,29.5282315,29.1642955,28.671571}, {35.3677425,35.0413535,31.784742,31.1758225}, {35.2865585,34.931363,31.522199,30.886781},
-//   {34.3215215,34.1180015,30.729245,29.380078}, {34.27057,34.057146,30.6005365,29.2456255}, {30.1308955,30.064905,29.9221805,29.7150395}, {29.7158605,29.650447,29.5033695,29.2883225}};
-
-//  Real T_init[16,4] = {{36.9,36.1,35.8,35.6}, {36.5,36.2,34.5,33.6}, {36.5,35.8,34.4,33.2}, {36.3,35.6,34.5,33.4},
-//                      {35.8,34.6,33.8,33.4}, {35.8,34.6,33.8,33.4}, {35.5,34.8,34.7,34.6}, {35.5,34.8,34.7,34.6},
-//                      {35.4,35.3,35.3,35.2}, {35.4,35.3,35.3,35.2}, {35.8,35.2,34.4,33.8}, {35.8,35.2,34.4,33.8},
-//                      {35.6,34.4,33.9,33.4}, {35.6,34.4,33.9,33.4}, {35.1,34.9,34.4,33.9}, {35.1,34.9,34.4,33.9}};
-
-//  Real T_init[16,4] = {{36.3801,34.369923,33.840313,33.34496},{36.193737,36.55834,34.013107,33.04382},{36.327477,36.53142,34.004562,33.020077},{36.50928,36.656628,32.89653,30.320864},
-//                        {35.686703,34.980026,33.681522,33.01845},{35.686703,34.980026,33.681522,33.01845},{35.77191,35.275238,33.824665,33.38565},{35.77191,35.275238,33.824665,33.38565},
-//                        {29.107143,28.769588,28.413647,27.955654},{29.107143,28.769588,28.413647,27.955654},{35.15843,34.764465,31.245749,30.684666},{35.15843,34.764465,31.245749,30.684666},
-//                        {34.359196,34.166264,30.854486,29.66598},{34.359196,34.166264,30.854486,29.66598},{28.433496,28.355068,28.183147,27.93326},{28.433496,28.355068,28.183147,27.93326}}; //for 17deg at 0.65clo
+  Real t_0[16];  //operative temperature (simplified)
+  Real T_o[16];  //operative temperatire (improved)
 
 
-//  Real T_init[16,4] = {{36.183342,33.48974,32.49579,31.590584},{35.9551,36.516846,31.82774,30.043242},{36.154015,36.48825,31.854177,30.047497},{36.348495,36.667465,31.55319,28.082823},
-//                       {34.79925,33.31224,30.536646,29.206947},{34.79925,33.31224,30.536646,29.206947},{35.500713,34.881542,31.851164,30.945454},{35.500713,34.881542,31.851164,30.945454},
-//                       {26.288668,25.835714,25.358637,24.745087},{26.288668,25.835714,25.358637,24.745087},{34.968018,34.54971,30.271544,29.592018},{34.968018,34.54971,30.271544,29.592018},
-//                       {34.21073,34.02398,30.017149,28.582853},{34.21073,34.02398,30.017149,28.582853},{22.732122,22.625874,22.367723,21.999928},{22.732122,22.625874,22.367723,21.999928}}; //for 17deg at 0.0clo
-
+  //Bulk Variables
+  Real sumQ;      //total metabolic heat gain
+  Real sumB;      //total heat transfer from blood flow
+  Real sumW;      //total heat gain from external work
+  Real sumCh;     //total heat gain from shiver
+  Real sumQt;     //total sensible heat exchange with environment
+  Real sumE;      //total evaporative heat exchange with environment
+  Real sumEsw;    //total evaporative heat loss due to sweat
+  Real T_ave;     //mean body temperature (simple mean)
+  Real T_ave2;    //mean body temperature (7-point average)
+  Real E_v;       //skin wettedness
 
 
   
 initial equation
-
+  //initialization of starting conditions
   for i in 1:16 loop
     for j in 1:4 loop
       T[i,j] = T_init[i,j];
-      //T_init[i,j] = T_air[i];
     end for;
   end for;
+
 
 equation
 
@@ -219,16 +182,12 @@ equation
   //heat balance blood
   C_cb * der(T_cb) = sum(B);
 
-  SHIV = 24.36*Cld[1,1]*CLDS;
 
   for i in 1:16 loop
 
     T_a[i] = T_air[i] - 273.15;
     h[i] = h_c[i] + h_r[i];
-//    h_r[i] = if (RAD[i]>10) then abs(RAD[i] / abs(T_s[i] - MRT)) else 4; //T_s is the one in Celcius
-//    h_r[i] = if (RAD[i]>10) then abs(RAD[i] / abs(T_skin[i] - MRT)) else 4; //T_skin is the one in Kelvin -- USE THIS ONE!!!
-    h_r[i] = RAD[i]; //only use for paper yoke
-//    h_r[i] = 0.96 * (5.670374e-8) * ((T_skin[i]^2)+(MRT^2))* (T_skin[i]^2+MRT);
+    h_r[i] = if (RAD[i]>10) then abs(RAD[i] / abs(T_skin[i] - MRT)) else 4; //T_skin is the one in Kelvin
     h_c[i] = if (HTC[i]>0) then HTC[i] else 2;
     T_d[i] = T_a[i] - ((100-RH)/5);
     p_d[i] = 0.61078 * exp((17.2694*(T_d[i]))/((T_d[i])+238.3));
@@ -249,19 +208,14 @@ equation
     E_max[i] = h_e[i] * (p_sks[i] - p_d[i]) * A_Du[i];
     h_e[i] = (LR * i_cl[i])/((0.155*I_cl[i]) + (i_cl[i]/(h_c[i]*f_cl[i])));
 
-///////////////////NEED VALUES///////////////////////////////
-//    h_c[i] = 4; /////////////
-//    I_cl[i] = 0.6; //////////////
-    i_cl[i] = 0.4; ////////////
-    f_cl[i] = 1 + 0.3*I_cl[i]; ///////////
-//    h_r[i] = 4; /////////////
-    t_0[i] = T_a[i]; /////////////
-    T_o[i] = (h_r[i]*(MRT-273.15) + h_c[i]*T_a[i])/(h_r[i]+h_c[i]);
-///////////////////NEED VALUES///////////////////////////////
+    i_cl[i] = 0.4;
+    f_cl[i] = 1 + 0.3*I_cl[i];
+    t_0[i] = T_a[i];  //simplified operating temperature
+    T_o[i] = (h_r[i]*(MRT-273.15) + h_c[i]*T_a[i])/(h_r[i]+h_c[i]);  //improved operating temperature
 
     //sensible
-//    Q_t[i] = h_t[i] * (T[i,4] - T_o[i]) * A_Du[i]; //technically correct but sim is using other eqn
-    Q_t[i] = h_t[i] * (T[i,4] - t_0[i]) * A_Du[i]; //use this eqn
+    Q_t[i] = h_t[i] * (T[i,4] - T_o[i]) * A_Du[i];  //using improved operating temperature
+    //Q_t[i] = h_t[i] * (T[i,4] - t_0[i]) * A_Du[i];  //using simplified operating temperature
     1/(h_t[i]) = 0.155*I_cl[i] + (1/(h_c[i] + h_r[i]*f_cl[i]));
 
     //signal
@@ -274,13 +228,10 @@ equation
     //sweat
     esw[i] = (Core.sw*Err[1,1] + Skin.sw*(WRMS-CLDS) + P.sw*Wrm[1,1]*WRMS) * SKINS[i] * km[i];
     E_sw[i] = if (esw[i]>0) then esw[i] else 0;
-
-//////////////CHECK THESE VALUES/////////////////////////////
-//    LR[i] = 15.15 * ((T[i,4] + 273.2)/273.2);
     p_sks[i] = 0.61078 * exp((17.2694*(T[i,4]))/((T[i,4])+238.3));
     p_a[i] = 0.61078 * exp((17.2694*(T_a[i]))/((T_a[i])+238.3));
 
-    Mshiv[i] = SHIV*Chilf[i];
+
 
       for j in 1:4 loop
 
@@ -291,7 +242,6 @@ equation
         //heat production
         Q[i,j] = Q_b[i,j] + W[i,j] + C_h[i,j];
         w[i,j] = if (j == 2) then 58.2 * (met - Qb) * sum(A_Du) * Metf[i] else 0;
-        //w[i,j] = if (j == 2) then 58.2 * (MET - Qb) * sum(A_Du) * Metf[i] else 0;
         W[i,j] = if (w[i,j] > 0) then w[i,j] else 0;
 
         //blood flow
@@ -318,11 +268,6 @@ equation
 
       T_s[i] = T[i,4];
       T_skin[i] = T_s[i] + 273.15;
-
-      //f_cl[i] = (tcl1[i]-T_a[i])/(T_s[i]-T_a[i]);
-      //Cv[i] + R[i] = (T_s[i]-tcl2[i])/0.155*I_cl[i];
-      //Cv[i] = HTC[i]*(tcl2[i]-T_a[i]);
-      //R[i] = (RAD[i]/(T_skin[i]-MRT))*(tcl2[i]-MRT+273.15);
 
 
   end for;
