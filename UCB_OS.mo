@@ -7,7 +7,7 @@ model UCB_OS
   // 1-head, 2-chest, 3-back, 4-pelvis, 5-lShoulder, 6-rShoulder, 7-lArm, 8-rArm,
   // 9-lHand, 10-rHand, 11-lThigh, 12-rThigh, 13-lLeg, 14-rLeg, 15-lFoot, 16-rFoot.
 
-  // The model requires inputs from the UCB_LS (local sensation) sub-model.
+  // The model requires inputs from the UCB_LS (local sensation) sub-model and the eventGenerator model.
 
   // Developed based on the work published in https://doi.org/10.1016/j.buildenv.2009.06.020
   // and https://escholarship.org/uc/item/11m0n1wt by Zhang et al.
@@ -17,8 +17,8 @@ model UCB_OS
   // Model Inputs
   Modelica.Blocks.Interfaces.RealInput LS[16]	      annotation (Placement(transformation(extent={{-120,-20},{-80,20}})));	// Local Sensation
   Modelica.Blocks.Interfaces.BooleanInput event[2]  annotation (Placement(transformation(extent={{-120,40},{-80,80}})));  // Event trigger
-  //Note: the opposite-sensation model requires knowledge of when local heating/cooling loads are applied and removed. The event trigger is used to supply this information;
-  //      see event.mo for more details.
+  //Note: the opposite-sensation model requires knowledge of when local heating/cooling loads are applied and removed.
+  //      The event trigger is used to supply this information: see eventGenerator.mo for more details.
 
   // Model Outputs
   Modelica.Blocks.Interfaces.RealOutput OS	        annotation (Placement(transformation(extent={{80,-20},{120,20}})));	  // Overall Sensation
