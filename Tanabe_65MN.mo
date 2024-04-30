@@ -2,25 +2,35 @@ model Tanabe_65MN
 
   // Tanabe 65-MultiNode (65MN) Physiological Model
 
-
   // A model for calculating the local physiological and thermoregulatory response to different environmental conditions in 16 body segments (represented by i in array indices):
-  // 1-head, 2-chest, 3-back, 4-pelvis, 5-lShoulder, 6-rShoulder, 7-lArm, 8-rArm,
-  // 9-lHand, 10-rHand, 11-lThigh, 12-rThigh, 13-lLeg, 14-rLeg, 15-lFoot, 16-rFoot;
-  // And across 4 different tissue
+    // i=1-head, i=2-chest, i=3-back, i=4-pelvis, i=5-lShoulder, i=6-rShoulder, i=7-lArm, i=8-rArm,
+    // i=9-lHand, i=10-rHand, i=11-lThigh, i=12-rThigh, i=13-lLeg, i=14-rLeg, i=15-lFoot, i=16-rFoot;
+  // And across 4 different types of body tissue (represented by j in array indices):
+    // j=1-viscera, j=2-muscle, j=3-fat, j=4-skin;
+  // With an additional node representing the response of the core pool of central blood in the body (node 65, often labeled as '_cb')
 
-  // The model requires inputs from the UCB_LS (local sensation) and UCB_OS (overall sensation) sub-models.
+  // The model requires inputs from high-fidelity numerical analysis to provide the local heat transfer coefficients, local air temperatures, and local radiative heat flux loads
+  // for each body segment, as well as the bulk mean radiant temperature of the environment
+  // This model also requires the tanabe_ctrl.mo record block to be available.
 
-  // Developed based on the work published in https://doi.org/10.1016/j.buildenv.2009.06.015
-  // and https://escholarship.org/uc/item/11m0n1wt by Zhang et al.
+  // Developed based on the work published in https://doi.org/10.1016/S0378-7788(02)00014-2 by Tanabe et al.
 
-  Modelica.Blocks.Interfaces.RealInput T_air[16]
-    annotation (Placement(transformation(extent={{-120,-20},{-80,20}})));
-  Modelica.Blocks.Interfaces.RealInput HTC[16]
-    annotation (Placement(transformation(extent={{-120,40},{-80,80}})));
-                                                 //(start = {302.401,302.401,302.401,302.401,302.401,302.401,302.401,302.401,302.401,302.401,302.401,302.401,302.401,302.401,302.401,302.401}, unit="K")
-  Modelica.Blocks.Interfaces.RealOutput T_skin[17](unit="K")
-    annotation (Placement(transformation(extent={{80,-20},{120,20}})));
+  
+  // Model Inputs
+  Modelica.Blocks.Interfaces.RealInput T_air[16]              annotation (Placement(transformation(extent={{-120,-20},{-80,20}})));    // Local Air Temperature
+  Modelica.Blocks.Interfaces.RealInput HTC[16]                annotation (Placement(transformation(extent={{-120,40},{-80,80}})));     // Local Heat Transfer Coefficient
+  Modelica.Blocks.Interfaces.RealInput RAD[16]                annotation (Placement(transformation(extent={{-120,-80},{-80,-40}})));   // Local Radiative Heat Flux
+  Modelica.Blocks.Interfaces.RealInput MRT                    annotation (Placement(transformation(extent={{-120,-110},{-80,-70}})));  // Mean Radiant Temperature
+  Modelica.Blocks.Interfaces.RealInput Tamb                   annotation (Placement(transformation(extent={{-120,70},{-80,110}})));    // Bulk Air Temperature
 
+  // Model Outputs
+  Modelica.Blocks.Interfaces.RealOutput T_skin[17](unit="K")  annotation (Placement(transformation(extent={{80,-20},{120,20}})));
+  
+
+  //Model Parameters
+  parameter Real met = 1.0; //metabolic activity level [met]
+  parameter Real I_cl[16] = {0, 0, 0, 0.34, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};  //local clothing insulation levels [clo]
+  
   Real C_cb = 2.610*3600;
   Real arC = 1.067;
   Real RH = 70;
@@ -40,8 +50,7 @@ model Tanabe_65MN
   Real st;
   Real ST;
   Real RT = 10;
-  parameter Real met = 1.0;
-  parameter Real Qb = 0.778; //basal metabolic output for whole body
+  Real Qb = 0.778; //basal metabolic output for whole body
 
   Real T_a[16];
   Real T_s[17];
@@ -74,8 +83,6 @@ model Tanabe_65MN
   Real h_t[16];
   Real h[16];
   Real i_cl[16];
-  parameter Real I_cl[16] = {0, 0, 0, 0.34, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-  //Real I_cl[16] = {0.12, 3.37, 2.10, 2.14, 2.22, 2.22, 2.22, 2.22, 0.19, 0.19, 1.82, 1.82, 1.90, 1.90, 1.07, 1.07};
   Real km[16];
   Real p_a[16];
   Real p_sks[16];
@@ -133,7 +140,6 @@ model Tanabe_65MN
   Real SKINC[16] = {0.022, 0.065, 0.065, 0.065, 0.022, 0.022, 0.022, 0.022, 0.152, 0.152, 0.022, 0.022, 0.022, 0.022, 0.152, 0.152};
 
   Real Chilf[16] = {0.02, 0.258, 0.227, 0.365, 0.004, 0.004, 0.026, 0.026, 0, 0, 0.023, 0.023, 0.012, 0.012, 0, 0};
-//  Real Chilf[16] = {0.0775, 0.2739, 0.2410, 0.3875, 0.00024, 0.00024, 0.0014, 0.0014, 0.000, 0.000, 0.0039, 0.0039, 0.0018, 0.0018, 0.000, 0.000};
   Real SHIV;
   Real Mshiv[16];
 
@@ -147,10 +153,9 @@ model Tanabe_65MN
 
   Real T_o[16];
 
-  //Real tcl1[16];
-  //Real tcl2[16];
-  //Real Cv[16];
-  //Real R[16];
+  tanabe_ctrl Core(sw=371.2,ch=0,dl=117,st=11.5)  annotation (Placement(transformation(extent={{-30,-70},{-10,-50}})));
+  tanabe_ctrl Skin(sw=33.6,ch=0,dl=7.5,st=11.5)   annotation (Placement(transformation(extent={{10,-70},{30,-50}})));
+  tanabe_ctrl P(sw=0,ch=24.4,dl=0,st=0)           annotation (Placement(transformation(extent={{50,-70},{70,-50}})));
 
 // run 1 - start = 60
   Real T_init[16,4] = {{36.47, 34.6, 34.16, 33.75}, {36.27, 36.58, 34.65, 33.92}, {36.41, 36.56, 34.61, 33.85}, {36.58, 36.67, 33.68, 31.63},
@@ -182,33 +187,7 @@ model Tanabe_65MN
 
 
 
-
-  tanabe_ctrl Core(
-    sw=371.2,
-    ch=0,
-    dl=117,
-    st=11.5)
-    annotation (Placement(transformation(extent={{-30,-70},{-10,-50}})));
-  tanabe_ctrl Skin(
-    sw=33.6,
-    ch=0,
-    dl=7.5,
-    st=11.5) annotation (Placement(transformation(extent={{10,-70},{30,-50}})));
-  tanabe_ctrl P(
-    sw=0,
-    ch=24.4,
-    dl=0,
-    st=0) annotation (Placement(transformation(extent={{50,-70},{70,-50}})));
-
-
-  Modelica.Blocks.Interfaces.RealInput RAD[16]
-    annotation (Placement(transformation(extent={{-120,-80},{-80,-40}})));
-  Modelica.Blocks.Interfaces.RealInput Tamb
-    annotation (Placement(transformation(extent={{-120,70},{-80,110}})));
-  Modelica.Blocks.Interfaces.RealInput MRT
-    annotation (Placement(transformation(extent={{-120,-110},{-80,-70}})));
- // Modelica.Blocks.Interfaces.RealInput MET
- //   annotation (Placement(transformation(extent={{-20,80},{20,120}})));
+  
 initial equation
 
   for i in 1:16 loop
