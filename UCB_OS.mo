@@ -66,13 +66,13 @@ model UCB_OS
   Real dLSon[16](start={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0});  // array used to save the state of the local sensations when a heating/cooling load is applied (event trigger 1)
   Real dLSoff[16](start={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}); // array used to save the state of the local sensations when a heating/cooling load is removed (event trigger 2)
   Real deltaLS[16];      // change in local sensation since the last event trigger
-  Real force[16];        // 
-  Real iF[16];
-  Integer j[16];
-  Real iF_sort[16];
-  Integer iF_index[16];
-  Boolean OSMwarm;
-  Boolean OSMcool;
+  Real force[16];        // potential individual force from each local sensation
+  Real iF[16];           // individual force from opposing local sensations (removes non-qualifying values from force)
+  Integer j[16];         // used to track which regression coefficients to apply (i.e. opposite=warm or opposite=cool)
+  Real iF_sort[16];      // used to sort the individual forces in descending order
+  Integer iF_index[16];  // used to track the body segment index for sorted individual forces
+  Boolean OSMwarm;       // modifying contribution if opposite sensations are warm
+  Boolean OSMcool;       // modifying contribution if opposite sensations are cool
 
 
 
@@ -246,7 +246,6 @@ equation
     dLS[i] = if event[1] then dLSon[i] else dLSoff[i];
     deltaLS[i] = LS[i] - dLS[i];
     force[i] = a[i,j[i]]*(deltaLS[i]-c[i,j[i]]) + b[i,j[i]];
- //   iF[i] = if ( (OSMwarm and (LS[i]<=-2)) or (OSMcool and (LS[i]>=2)))  then force[i] else 0; //unnessesary now that i think of it, using opposite ends of the sort array filters just in a slightly less robust way, this actually removes votes that are not in NOS group of OSM
     iF[i] = if ( (OSMwarm and (LS[i]<=0)) or (OSMcool and (LS[i]>=0)))  then force[i] else 0; //should that have been a +-2??? dont think it affects the results
     j[i] = if deltaLS[i]<=-2 then 1 elseif deltaLS[i]>=2 then 3 else 2;
   end for;
