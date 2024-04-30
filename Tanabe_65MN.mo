@@ -21,7 +21,6 @@ model Tanabe_65MN
   Modelica.Blocks.Interfaces.RealInput HTC[16]                annotation (Placement(transformation(extent={{-120,40},{-80,80}})));     // Local Heat Transfer Coefficient
   Modelica.Blocks.Interfaces.RealInput RAD[16]                annotation (Placement(transformation(extent={{-120,-80},{-80,-40}})));   // Local Radiative Heat Flux
   Modelica.Blocks.Interfaces.RealInput MRT                    annotation (Placement(transformation(extent={{-120,-110},{-80,-70}})));  // Mean Radiant Temperature
-  Modelica.Blocks.Interfaces.RealInput Tamb                   annotation (Placement(transformation(extent={{-120,70},{-80,110}})));    // Bulk Air Temperature
 
   // Model Outputs
   Modelica.Blocks.Interfaces.RealOutput T_skin[17](unit="K")  annotation (Placement(transformation(extent={{80,-20},{120,20}})));      // Local Skin & Core Temperature(s)
@@ -103,9 +102,10 @@ model Tanabe_65MN
   Real SKINC[16] = {0.022, 0.065, 0.065, 0.065, 0.022, 0.022, 0.022, 0.022, 0.152, 0.152, 0.022, 0.022, 0.022, 0.022, 0.152, 0.152}; //distribution coefficient for skin vasoconstriction
   Real Chilf[16] = {0.02, 0.258, 0.227, 0.365, 0.004, 0.004, 0.026, 0.026, 0, 0, 0.023, 0.023, 0.012, 0.012, 0, 0};                  //distribution coefficient for muscle heat production (shiver)
   Real Metf[16] = {0, 0.091, 0.08, 0.129, 0.026, 0.026, 0.014, 0.014, 0.005, 0.005, 0.201, 0.201, 0.099, 0.099, 0.005, 0.005};       //distribution coefficient for muscle heat production (work)
-  tanabe_ctrl Core(sw=371.2,ch=0,dl=117,st=11.5)  annotation (Placement(transformation(extent={{-30,-70},{-10,-50}})));  //
-  tanabe_ctrl Skin(sw=33.6,ch=0,dl=7.5,st=11.5)   annotation (Placement(transformation(extent={{10,-70},{30,-50}})));    //
-  tanabe_ctrl P(sw=0,ch=24.4,dl=0,st=0)           annotation (Placement(transformation(extent={{50,-70},{70,-50}})));    //
+  tanabe_ctrl Core(sw=371.2,ch=0,dl=117,st=11.5)  annotation (Placement(transformation(extent={{-30,-70},{-10,-50}})));  //coefficient for core sweat/shiver/dilation/constriction control
+  tanabe_ctrl Skin(sw=33.6,ch=0,dl=7.5,st=11.5)   annotation (Placement(transformation(extent={{10,-70},{30,-50}})));    //coefficient for skin sweat/shiver/dilation/constriction control
+  tanabe_ctrl P(sw=0,ch=24.4,dl=0,st=0)           annotation (Placement(transformation(extent={{50,-70},{70,-50}})));    //coefficient for combined sweat/shiver/dilation/constriction control
+  //Note: the functions above require the tanabe_ctrl.mo record model.
   
   //Thermoregulation variables
   Real Err[16,4];
@@ -123,27 +123,24 @@ model Tanabe_65MN
   Real km[16];
   Real RATE[16,4];
 
-  //Environmental Variables
-  Real RH = 70;
-  Real T_d[16];
-  Real p_d[16];
-  Real T0;
+  //Environmental/Personal Variables
+  Real i_cl[16];  //local clothing permeability factor
+  Real f_cl[16];  //local clothing fraction
+  Real h_c[16];  //local convective heat transfer coefficient
+  Real h_r[16];  //local radiative heat transfer coefficient
+  Real h_e[16];  //local evaporative heat transfer coefficient
+  Real h_t[16];  //local total heat transfer coefficient from skin surface to environment
+  Real h[16];  //local combined convective and radiative heat transfer coefficient
+  Real RH = 70;  //relative humidity [%]
   //Real LR = 2.2; //Lewis Ratio (65MN value)
   Real LR = 16.5; //Lewis Ratio (JOS3 value)
-  Real f_cl[16];
-  //Real h_c[16] = {4.0, 4.2, 3.8, 4.2, 5.2, 5.2, 5, 5, 6, 6, 4.3, 4.3, 4.1, 4.1, 6, 6};
-  //Real h_r[16] = {4.6, 3.7, 4.3, 4, 4.6, 4.6, 3.9, 3.9, 4.4, 4.4, 3.8, 3.8, 4.4, 4.4, 5.9, 5.9};
-  Real h_c[16];
-  Real h_r[16];
-  Real h_e[16];
-  Real h_t[16];
-  Real h[16];
-  Real i_cl[16];
-  Real T_a[16];
-  Real p_a[16];
-  Real p_sks[16];
-  Real t_0[16];  //operative temperature (simplified)
-  Real T_o[16];  //operative temperatire (improved)
+  Real T_d[16];  //local dry bulb temperature [degC]
+  Real p_d[16];  //local dry bulb vapour pressure [kPa]
+  Real p_a[16];  //local vapour pressure [kPa]
+  Real p_sks[16];  //local saturation vapour pressure [kPa]
+  Real t_0[16];  //local operative temperature (simplified) [degC]
+  Real T_o[16];  //local operative temperatire (improved) [degC]
+  Real T_a[16];  //local air temperature (conversion [K] -> [degC]) [degC]
 
 
   //Bulk Variables
@@ -291,8 +288,6 @@ equation
   T_ave = (T_s[1] + T_s[2] + T_s[3] + T_s[4] + T_s[11] + T_s[12] + T_s[13] + T_s[16] + T_s[5] + T_s[10])/10;
   T_ave2 = 0.07*T_s[1] + 0.175*T_s[2] + 0.175*T_s[3] + 0.07*T_s[5] + 0.07*T_s[7] + 0.05*T_s[9] + 0.19*T_s[11] + 0.20*T_s[13];
   E_v = 0.86 * sum(E) / 1.87;
-
-  T0 = Tamb;
 
 
 end Tanabe_65MN;
