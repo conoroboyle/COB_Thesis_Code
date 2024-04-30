@@ -213,26 +213,29 @@ equation
     end if;
   end if;
 
-  //event operations
-  when event[1] then
+  //Event operations for opposite-sensation model
+  when event[1] then          //when a heating/cooling load is applied
     for i in 1:16 loop
-      dLSon[i] = pre(LS[i]);
+      dLSon[i] = pre(LS[i]);  //array saves the local sensation variables at the instant that state event happens
     end for;
   end when;
-  when event[2] then
+
+  when event[2] then          //when a heating/cooling load is removed
     for i in 1:16 loop
-      dLSoff[i] = pre(LS[i]);
+      dLSoff[i] = pre(LS[i]); //array saves the local sensation variables at the instant that state event happens
     end for;
   end when;
-  //calculating individual forces
+
+  //Calculating individual forces for opposite-sensation contribution
   for i in 1 : 16 loop
-    dLS[i] = if event[1] then dLSon[i] else dLSoff[i];
-    deltaLS[i] = LS[i] - dLS[i];
-    force[i] = a[i,j[i]]*(deltaLS[i]-c[i,j[i]]) + b[i,j[i]];
-    iF[i] = if ( (OSMwarm and (LS[i]<=0)) or (OSMcool and (LS[i]>=0)))  then force[i] else 0; //should that have been a +-2??? dont think it affects the results
-    j[i] = if deltaLS[i]<=-2 then 1 elseif deltaLS[i]>=2 then 3 else 2;
+    dLS[i] = if event[1] then dLSon[i] else dLSoff[i];  // take previous local sensation based on active event trigger
+    deltaLS[i] = LS[i] - dLS[i];                        // calculate difference in local sensation since event trigger
+
+    j[i] = if deltaLS[i]<=-2 then 1 elseif deltaLS[i]>=2 then 3 else 2;                       // determine which regression coefficients to use
+    force[i] = a[i,j[i]]*(deltaLS[i]-c[i,j[i]]) + b[i,j[i]];                                  // calculate potential restoring force in all body segments
+    iF[i] = if ( (OSMwarm and (LS[i]<=0)) or (OSMcool and (LS[i]>=0)))  then force[i] else 0; // calculate actual restoring forces (filter out non-qualifying segments)
   end for;
-  (iF_sort, iF_index) = Modelica.Math.Vectors.sort(iF, ascending=false);
+  (iF_sort, iF_index) = Modelica.Math.Vectors.sort(iF, ascending=false);  //sort resorting forces from most positive -> most negative
 
 
 end UCB_OS;
