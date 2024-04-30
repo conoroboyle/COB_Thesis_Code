@@ -31,7 +31,12 @@ model Tanabe_65MN
   parameter Real met = 1.0; //metabolic activity level [met]
   parameter Real I_cl[16] = {0, 0, 0, 0.34, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};  //local clothing insulation levels [clo]
 
-  //Model Constants
+  //Model Variables
+  //Passive system variables
+  Real C_cb = 2.610*3600;    //core blood heat capacity [W.s/K]
+  Real arC = 1.067;          //counter-current variable
+  Real Qb = 0.778;           //basal metabolic output for whole body [met]
+  
   Real A_Du[16] = {0.14, 0.175, 0.161, 0.221, 0.096, 0.096, 0.063, 0.063, 0.05, 0.05, 0.209, 0.209, 0.112, 0.112, 0.056, 0.056};    //local DuBois body surface area {i} [m2]
 
   Real c[16,4] = {{2.576,0.386,0.258,0.282}, {2.915,5.669,1.496,0.418}, {2.471,5.022,1.322,0.386}, {6.017,7.997,2.102,0.606},
@@ -49,71 +54,83 @@ model Tanabe_65MN
                      {0.320,1.280,0.160,0.860}, {0.320,1.280,0.160,0.860}, {0.160,0.670,0.085,0.450}, {0.160,0.670,0.085,0.450},
                      {0.091,0.078,0.042,0.910}, {0.091,0.078,0.042,0.910}, {0.364,0.855,0.150,0.380}, {0.364,0.855,0.150,0.380},
                      {0.071,0.070,0.019,0.110}, {0.071,0.070,0.019,0.110}, {0.049,0.010,0.019,0.450}, {0.049,0.010,0.019,0.450}};    //basal blood flow rate in each node {i,j} [L/h]
-  Real BFB[16,4];  //array used for conversion from [h]ours -> [s]econds
+  Real BFB[16,4];  //array used to convert bfb{i,j} from [h]ours -> [s]econds || [L/s]
+  Real BF[16,4];   //actual blood flow rate in node {i,j} [L/s]
+  Real B[16,4];    //heat exchange between core blood and node {i,j} [W]
 
   Real C_d[16,3] = {{1.601,13.224,16.008}, {0.616,2.100,9.164}, {0.594,2.018,8.700}, {0.379,1.276,5.104},
                     {0.441,2.946,7.308}, {0.441,2.946,7.308}, {0.244,2.227,7.888}, {0.244,2.227,7.888},
                     {2.181,6.484,5.858}, {2.181,6.484,5.858}, {2.401,4.536,30.160}, {2.401,4.536,30.160},
                     {1.891,2.656,7.540}, {1.891,2.656,7.540}, {8.12,10.266,8.178}, {8.12,10.266,8.178}};    //thermal conductance between node {i,j} and its neighbour {i,j+1} [W/K]
+  Real D[16,4];   //heat transfer in each node {i,j} due to conduction [W]
 
+  Real res;      //respiration heat transfer [W]
+  Real RES[16];  //respiration in each segment {i} [W]
+
+  Real T[16,4];             //temperatures in each node {i,j} [degC]
+  Real T_cb(start = 37.11); //temperature of core blood  [degC]
+  Real T_init[16,4] = {{36.47, 34.6, 34.16, 33.75}, {36.27, 36.58, 34.65, 33.92}, {36.41, 36.56, 34.61, 33.85}, {36.58, 36.67, 33.68, 31.63},
+                        {36.01, 35.61, 34.8, 34.36}, {36.01, 35.61, 34.8, 34.36}, {35.89, 35.47, 34.4, 34.08}, {35.88, 35.45, 34.38, 34.05},
+                        {30.19, 29.9, 29.58, 29.18}, {29.92, 29.62, 29.29, 28.88}, {35.37, 35.04, 32, 31.51}, {35.29, 34.93, 31.73, 31.21},
+                        {34.33, 34.12, 30.85, 29.67}, {34.28, 34.06, 30.71, 29.51}, {30.16, 30.09, 29.95, 29.73}, {29.74, 29.67, 29.52, 29.29}}; //initialization temperatures in node {i,j} [degC]
   Real T_set[16,4] = {{36.9,36.1,35.8,35.6}, {36.5,36.2,34.5,33.6}, {36.5,35.8,34.4,33.2}, {36.3,35.6,34.5,33.4},
                       {35.8,34.6,33.8,33.4}, {35.8,34.6,33.8,33.4}, {35.5,34.8,34.7,34.6}, {35.5,34.8,34.7,34.6},
                       {35.4,35.3,35.3,35.2}, {35.4,35.3,35.3,35.2}, {35.8,35.2,34.4,33.8}, {35.8,35.2,34.4,33.8},
-                      {35.6,34.4,33.9,33.4}, {35.6,34.4,33.9,33.4}, {35.1,34.9,34.4,33.9}, {35.1,34.9,34.4,33.9}};
+                      {35.6,34.4,33.9,33.4}, {35.6,34.4,33.9,33.4}, {35.1,34.9,34.4,33.9}, {35.1,34.9,34.4,33.9}};    //thermoregulation setpoint tempertures in node {i,j} [degC]
+  Real T_ave;
+  Real E_v;
+  Real T_ave2;
 
+  //Active system variables 
+  //Distribution coefficients
   Real SKINR[16] = {0.07, 0.149, 0.132, 0.212, 0.023, 0.023, 0.012, 0.012, 0.092, 0.092, 0.05, 0.05, 0.025, 0.025, 0.017, 0.017};    //distribution coefficient for skin sensors
   Real SKINS[16] = {0.081, 0.146, 0.129, 0.206, 0.051, 0.051, 0.026, 0.026, 0.016, 0.016, 0.073, 0.073, 0.036, 0.036, 0.018, 0.018}; //distribution coefficient for skin sweat
   Real SKINV[16] = {0.32, 0.098, 0.086, 0.138, 0.031, 0.031, 0.016, 0.016, 0.061, 0.061, 0.092, 0.092, 0.023, 0.023, 0.05, 0.05};    //distribution coefficient for skin vasodilation
   Real SKINC[16] = {0.022, 0.065, 0.065, 0.065, 0.022, 0.022, 0.022, 0.022, 0.152, 0.152, 0.022, 0.022, 0.022, 0.022, 0.152, 0.152}; //distribution coefficient for skin vasoconstriction
   Real Chilf[16] = {0.02, 0.258, 0.227, 0.365, 0.004, 0.004, 0.026, 0.026, 0, 0, 0.023, 0.023, 0.012, 0.012, 0, 0};                  //distribution coefficient for muscle heat production (shiver)
   Real Metf[16] = {0, 0.091, 0.08, 0.129, 0.026, 0.026, 0.014, 0.014, 0.005, 0.005, 0.201, 0.201, 0.099, 0.099, 0.005, 0.005};       //distribution coefficient for muscle heat production (work)
-  
-  Real SHIV;
-  
-  Real C_cb = 2.610*3600;
-  Real arC = 1.067;
-  Real RH = 70;
-  Real T_d[16];
-  Real p_d[16];
-  Real T0;
 
-  Real T_cb(start = 37.11); //t=60
-//  Real T_cb(start = 36.23); //t=240
-  Real res;
+  //Thermoregulation variables
+  Real Err[16,4];
+  Real SHIV;
   Real WRMS;
   Real CLDS;
-  //Real LR = 2.2; //old value
-  Real LR = 16.5; //JOS3 value
   Real dl;
   Real DL;
   Real st;
   Real ST;
   Real RT = 10;
-  Real Qb = 0.778; //basal metabolic output for whole body
 
+  //Environmental Variables
+  Real RH = 70;
+  Real T_d[16];
+  Real p_d[16];
+  Real T0;
+  //Real LR = 2.2; //Lewis Ratio (65MN value)
+  Real LR = 16.5; //Lewis Ratio (JOS3 value)
   Real T_a[16];
   Real T_s[17];
 
-  Real T_ave;
-  Real E_v;
-  Real T_ave2;
 
-  Real B[16,4];
-  Real BF[16,4];
+
+  
+
+
+
+
+
   Real ch[16,4];
   Real C_h[16,4];
   Real Cld[16,4];
   Real clds[16];
-  Real D[16,4];
   Real e[16];
   Real E[16];
   Real E_b[16];
   Real esw[16];
   Real E_sw[16];
   Real E_max[16];
-  Real Err[16,4];
+
   Real f_cl[16];
-  //Real f_cl[16] = {1.57, 1.04, 1.16, 1.05, 1.23, 1.23, 1.25, 1.25, 1, 1, 1.06, 1.06, 1.11, 1.11, 1.38, 1.38};
   //Real h_c[16] = {4.0, 4.2, 3.8, 4.2, 5.2, 5.2, 5, 5, 6, 6, 4.3, 4.3, 4.1, 4.1, 6, 6};
   //Real h_r[16] = {4.6, 3.7, 4.3, 4, 4.6, 4.6, 3.9, 3.9, 4.4, 4.4, 3.8, 3.8, 4.4, 4.4, 5.9, 5.9};
   Real h_c[16];
@@ -127,12 +144,8 @@ model Tanabe_65MN
   Real p_sks[16];
   Real Q[16,4];
   Real Q_t[16];
-  Real RES[16];
   Real RATE[16,4];
-  Real T[16,4]; //(start = {{36.9,36.1,35.8,35.6}, {36.5,36.2,34.5,33.6}, {36.5,35.8,34.4,33.2}, {36.3,35.6,34.5,33.4},
-                //          {35.8,34.6,33.8,33.4}, {35.8,34.6,33.8,33.4}, {35.5,34.8,34.7,34.6}, {35.5,34.8,34.7,34.6},
-                //          {35.4,35.3,35.3,35.2}, {35.4,35.3,35.3,35.2}, {35.8,35.2,34.4,33.8}, {35.8,35.2,34.4,33.8},
-                //          {35.6,34.4,33.9,33.4}, {35.6,34.4,33.9,33.4}, {35.1,34.9,34.4,33.9}, {35.1,34.9,34.4,33.9}});
+
   Real t_0[16];
   Real w[16,4];
   Real W[16,4];
@@ -157,10 +170,7 @@ model Tanabe_65MN
   tanabe_ctrl P(sw=0,ch=24.4,dl=0,st=0)           annotation (Placement(transformation(extent={{50,-70},{70,-50}})));
 
 // run 1 - start = 60
-  Real T_init[16,4] = {{36.47, 34.6, 34.16, 33.75}, {36.27, 36.58, 34.65, 33.92}, {36.41, 36.56, 34.61, 33.85}, {36.58, 36.67, 33.68, 31.63},
-                        {36.01, 35.61, 34.8, 34.36}, {36.01, 35.61, 34.8, 34.36}, {35.89, 35.47, 34.4, 34.08}, {35.88, 35.45, 34.38, 34.05},
-                        {30.19, 29.9, 29.58, 29.18}, {29.92, 29.62, 29.29, 28.88}, {35.37, 35.04, 32, 31.51}, {35.29, 34.93, 31.73, 31.21},
-                        {34.33, 34.12, 30.85, 29.67}, {34.28, 34.06, 30.71, 29.51}, {30.16, 30.09, 29.95, 29.73}, {29.74, 29.67, 29.52, 29.29}}; //for 17deg at 1.3clo at crash point
+  
 
 // run 2 - start = 240
 //  Real T_init[16,4] = { {36.530077,34.5789055,34.0849915,33.588355}, {36.324846,36.593997,34.6445165,33.7975265}, {36.482216,36.574137,34.607044,33.778338}, {36.600231,36.6844985,33.670663,31.3624265},
