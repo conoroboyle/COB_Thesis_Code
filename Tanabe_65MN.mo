@@ -157,8 +157,8 @@ model Tanabe_65MN
 
 
   
+//initialization of starting conditions
 initial equation
-  //initialization of starting conditions
   for i in 1:16 loop
     for j in 1:4 loop
       T[i,j] = T_init[i,j];
@@ -166,30 +166,23 @@ initial equation
   end for;
 
 
+
 equation
 
-  sumQ = sum(Q);
-  sumB = sum(B);
-  sumW = sum(W);
-  sumCh = sum(C_h);
-  sumQt = sum(Q_t);
-  sumE = sum(E);
-  sumEsw = sum(E_sw);
+  //process local inputs from high-fidelity analysis
+  for i in 1:16 loop
+    T_a[i] = T_air[i] - 273.15;  //convert local temperature to Celcius 
+    h_c[i] = if (HTC[i]>0) then HTC[i] else 2; //import convective heat transfer coefficients (minimum value applied to stop errors)
+    h_r[i] = if (RAD[i]>10) then abs(RAD[i] / abs(T_skin[i] - MRT)) else 4; //convert radiative heat flux into a radiative heat transfer coefficient
+  end for;
 
-  //heat balance blood
+  //heat balance (blood)
   C_cb * der(T_cb) = sum(B);
 
-
+  //for every segment
   for i in 1:16 loop
 
-    T_a[i] = T_air[i] - 273.15;
-    h[i] = h_c[i] + h_r[i];
-    h_r[i] = if (RAD[i]>10) then abs(RAD[i] / abs(T_skin[i] - MRT)) else 4; //T_skin is the one in Kelvin
-    h_c[i] = if (HTC[i]>0) then HTC[i] else 2;
-    T_d[i] = T_a[i] - ((100-RH)/5);
-    p_d[i] = 0.61078 * exp((17.2694*(T_d[i]))/((T_d[i])+238.3));
-
-    //heat balance
+    //heat balance (body)
     C[i,1] * der(T[i,1]) = Q[i,1] - B[i,1] - D[i,1] - RES[i];
     C[i,2] * der(T[i,2]) = Q[i,2] - B[i,2] + D[i,1] - D[i,2];
     C[i,3] * der(T[i,3]) = Q[i,3] - B[i,3] + D[i,2] - D[i,3];
@@ -205,17 +198,23 @@ equation
     E_max[i] = h_e[i] * (p_sks[i] - p_d[i]) * A_Du[i];
     h_e[i] = (LR * i_cl[i])/((0.155*I_cl[i]) + (i_cl[i]/(h_c[i]*f_cl[i])));
 
+    //clothing
     i_cl[i] = 0.4;
     f_cl[i] = 1 + 0.3*I_cl[i];
-    t_0[i] = T_a[i];  //simplified operating temperature
+
+    //pyschrometry
+    T_d[i] = T_a[i] - ((100-RH)/5);
+    p_d[i] = 0.61078 * exp((17.2694*(T_d[i]))/((T_d[i])+238.3));
+    //t_0[i] = T_a[i];  //simplified operating temperature
     T_o[i] = (h_r[i]*(MRT-273.15) + h_c[i]*T_a[i])/(h_r[i]+h_c[i]);  //improved operating temperature
 
-    //sensible
+    //sensible heat transfer
     Q_t[i] = h_t[i] * (T[i,4] - T_o[i]) * A_Du[i];  //using improved operating temperature
     //Q_t[i] = h_t[i] * (T[i,4] - t_0[i]) * A_Du[i];  //using simplified operating temperature
     1/(h_t[i]) = 0.155*I_cl[i] + (1/(h_c[i] + h_r[i]*f_cl[i]));
+    h[i] = h_c[i] + h_r[i];
 
-    //signal
+    //skin signals
     wrms[i] = SKINR[i] * Wrm[i,4];
     clds[i] = SKINR[i] * Cld[i,4];
 
@@ -229,12 +228,8 @@ equation
     p_a[i] = 0.61078 * exp((17.2694*(T_a[i]))/((T_a[i])+238.3));
 
 
-
+      //calculate nodal values
       for j in 1:4 loop
-
-        RATE[i,j] = 0*3600;
-        BFB[i,j] = bfb[i,j];
-        C[i,j] = c[i,j]*3600;
 
         //heat production
         Q[i,j] = Q_b[i,j] + W[i,j] + C_h[i,j];
@@ -261,32 +256,48 @@ equation
         ch[i,j] = if (j==2) then (-Core.ch*Err[1,1] - Skin.ch*(WRMS-CLDS) + P.ch*Cld[1,1]*CLDS)*Chilf[i] else 0;
         C_h[i,j] = if (ch[i,j]>0) then ch[i,j] else 0;
 
+        //convert variables
+        RATE[i,j] = 0*3600;
+        BFB[i,j] = bfb[i,j];
+        C[i,j] = c[i,j]*3600;
+
       end for;
 
+      //output skin temperatures
       T_s[i] = T[i,4];
       T_skin[i] = T_s[i] + 273.15;
 
-
   end for;
+
+  //add core temperature to outputs
+  T_s[17] = T_cb;
+  T_skin[17] = T_s[17] + 273.15;
 
   //respiration loss
   res = (0.0014*(34 - T_a[1]) + 0.017*(5.867 - p_d[1])) * sum(Q);
 
-  //warm & cold signal
+  //whole body warm & cold signals
   WRMS = sum(wrms);
   CLDS = sum(clds);
 
-  //vasomotion signal
+  //vasomotion signals
   dl = Core.dl * Err[1,1] + Skin.dl * (WRMS - CLDS) + P.dl*Wrm[1,1]*WRMS;
   st = -Core.st * Err[1,1] - Skin.st * (WRMS - CLDS) + P.st*Cld[1,1]*CLDS;
   DL = if (dl>0) then dl else 0;
   ST = if (st>0) then st else 0;
 
-  T_s[17] = T_cb;
-  T_skin[17] = T_s[17] + 273.15;
+  //Bulk variable calculations
+  sumQ = sum(Q);
+  sumB = sum(B);
+  sumW = sum(W);
+  sumCh = sum(C_h);
+  sumQt = sum(Q_t);
+  sumE = sum(E);
+  sumEsw = sum(E_sw);
 
-  T_ave = (T_s[1] + T_s[2] + T_s[3] + T_s[4] + T_s[11] + T_s[12] + T_s[13] + T_s[16] + T_s[5] + T_s[10])/10;
-  T_ave2 = 0.07*T_s[1] + 0.175*T_s[2] + 0.175*T_s[3] + 0.07*T_s[5] + 0.07*T_s[7] + 0.05*T_s[9] + 0.19*T_s[11] + 0.20*T_s[13];
+  //Mean temperature & skin wettedness
+  T_ave = (T_s[1] + T_s[2] + T_s[3] + T_s[4] + T_s[11] + T_s[12] + T_s[13] + T_s[16] + T_s[5] + T_s[10])/10;  //(simple)
+  T_ave2 = 0.07*T_s[1] + 0.175*T_s[2] + 0.175*T_s[3] + 0.07*T_s[5] + 0.07*T_s[7] + 0.05*T_s[9] + 0.19*T_s[11] + 0.20*T_s[13];  //(7-point method)
   E_v = 0.86 * sum(E) / 1.87;
 
 
