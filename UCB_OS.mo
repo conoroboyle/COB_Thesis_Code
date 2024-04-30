@@ -46,15 +46,16 @@ model UCB_OS
   Boolean HTScool;  // conditions met to trigger high thermal sensation (cool) sub-model
 
   //No-Opposite-Sensation Rankings
-  Real rank[14];
-  Integer ranki[14];
-  Real LS_NOS[14];
+  Real LS_NOS[14];    // array used to remove the least impactful local sensations from the hands&&feet for the n-o-s model calculations
+  Real rank[14];      // used to sort the reduced local sensations in descending order (warmest -> coolest)
+  Integer ranki[14];  // used to track the body segment index of the sorted array
+
 
   //Low Thermal Sensation Votes
-  Integer np[1] = {14};
-  Real interval;
-  Real LTS[14];
-  Real nLTS[14];
+  Integer np[1] = {14}; //total number of potential sensation votes
+  Real interval;        // counting interval
+  Real LTS[14];         // qualifying local thermal sensations
+  Real nLTS[14];        // body segment index of qualifying local thermal sensations
 
   //Opposite-Sensation Model
   Real OS_big;  // main contribution to the overall sensation value (from n-o-s model)
@@ -75,25 +76,7 @@ model UCB_OS
 
 
 
-    //Local Sensation
-  Real LS_sort[16];
-  Integer LS_index[16];
-
-
-
-//initial equation
-//
-//  for i in 1:16 loop
-//    dLS[i] = 0;
-//    dLSon[i] = 0;
-//    dLSoff[i] = 0;
-//  end for;
-
 equation
-
-  //Local Sensation Rank
-  (LS_sort, LS_index) = Modelica.Math.Vectors.sort(LS, ascending=false);
-
 
   //Creating Sensation Groups
   for i in 1:16 loop
