@@ -108,20 +108,20 @@ model Tanabe_65MN
   //Note: the functions above require the tanabe_ctrl.mo record model.
   
   //Thermoregulation variables
-  Real Err[16,4];
-  Real WRMS;
-  Real CLDS;
-  Real dl;
-  Real DL;
-  Real st;
-  Real ST;
-  Real RT = 10;
-  Real Wrm[16,4];
-  Real wrms[16];
-  Real Cld[16,4];
-  Real clds[16];
-  Real km[16];
-  Real RATE[16,4];
+  Real Err[16,4];  //temperature error signal in each node {i,j}
+  Real Wrm[16,4];  //warm signal in each node {i,j}
+  Real wrms[16];  //warm signal in each segment at the skin layer {i}
+  Real WRMS;  //warm skin signal for the whole body
+  Real Cld[16,4];  //cold signal in each node {i,j}
+  Real clds[16];  //cold signal in each segment at the skin layer {i}
+  Real CLDS;  //cold skin signal for the whole body
+  Real dl;  //vasodilation signal
+  Real DL;  //vasodilation signal (filtered)
+  Real st;  //vasoconstriction signal
+  Real ST;  //vasoconstriction signal (filtered)
+  Real km[16];  //local vasomotion factor
+  Real RT = 10;  //temperature band for RT
+  Real RATE[16,4];  //dynamic sensitivity of thermoreceptors
 
   //Environmental/Personal Variables
   Real i_cl[16];  //local clothing permeability factor
@@ -153,7 +153,7 @@ model Tanabe_65MN
   Real sumEsw;    //total evaporative heat loss due to sweat
   Real T_ave;     //mean body temperature (simple mean)
   Real T_ave2;    //mean body temperature (7-point average)
-  Real E_v;       //skin wettedness
+  Real E_v;       //mean skin wettedness
 
 
   
