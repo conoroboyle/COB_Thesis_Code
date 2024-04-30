@@ -52,10 +52,10 @@ model UCB_OS
 
 
   //Low Thermal Sensation Votes
-  Integer np[1] = {14}; //total number of potential sensation votes
+  Integer np[1] = {14}; //total number of potential sensation votes for counting interval
   Real interval;        // counting interval
   Real LTS[14];         // qualifying local thermal sensations
-  Real nLTS[14];        // body segment index of qualifying local thermal sensations
+  Real nLTS[14];        // number of qualifying local thermal sensations
 
   //Opposite-Sensation Model
   Real OS_big;  // main contribution to the overall sensation value (from n-o-s model)
@@ -80,154 +80,137 @@ equation
 
   //Creating Sensation Groups
   for i in 1:16 loop
-    plus[i] = if (LS[i]>0) then 1 else 0;
-    minus[i] = if (LS[i]<0) then 1 else 0;
+    plus[i] = if (LS[i]>0) then 1 else 0;    // positive sensations (LS>0, warm)
+    minus[i] = if (LS[i]<0) then 1 else 0;   // negative sensations (LS<0, cool)
   end for;
-  n_plus = sum(plus);
-  n_minus = sum(minus);
+  n_plus = sum(plus);    // total number of positive sensations
+  n_minus = sum(minus);  // total number of negative sensations
 
 
-  //No-Opposite-Sensation Model - check 1
+  //No-Opposite-Sensation Model trigger
+  //Check 1: are all local sensation all warm or all cool?
   if ((n_plus<=0) or (n_minus<=0)) then
-    No_Opposite_Sensation_Model = true;
-  //No-Opposite-Sensation Model - check 2
+    No_Opposite_Sensation_Model = true;  // trigger no-opposite-sensation model
+  //Check 2: if opposing sensations are present do they meet the threshold to trigger the opposite-sensation model?
   elseif (LTSwarm and (rank[14]>=-1)) or (LTScool and (rank[1]<=1)) then
-    No_Opposite_Sensation_Model = true;
+    No_Opposite_Sensation_Model = true;  // trigger no-opposite-sensation model
   else
-    No_Opposite_Sensation_Model = false;
+    No_Opposite_Sensation_Model = false;  // trigger opposite-sensation model
   end if;
 
 
-  //Removal of Extremeties, highest impact value only, ony for NOS model
+  //Removal of duplicate votes for extremeties (hands/feet), highest impact value only is taken for n-o-s model
   for i in 1:8 loop
-    LS_NOS[i] = LS[i];
+    LS_NOS[i] = LS[i];      // fill array with local sensations in all other body parts
   end for;
   for i in 1:4 loop
-    LS_NOS[9+i] = LS[10+i];
+    LS_NOS[9+i] = LS[10+i]; // fill array with local sensations in all other body parts
   end for;
   if (n_plus>=n_minus) then
-    LS_NOS[9] = max(LS[9],LS[10]);
-    LS_NOS[14] = max(LS[15],LS[16]);
+    LS_NOS[9] = max(LS[9],LS[10]);    // if overall sensation will be warm use highest (warmest) hand vote
+    LS_NOS[14] = max(LS[15],LS[16]);  // if overall sensation will be warm use highest (warmest) foot vote
   else
-    LS_NOS[9] = min(LS[9],LS[10]);
-    LS_NOS[14] = min(LS[15],LS[16]);
+    LS_NOS[9] = min(LS[9],LS[10]);    // if overall sensation will be cool use lowest (coolest) hand vote
+    LS_NOS[14] = min(LS[15],LS[16]);  // if overall sensation will be cool use lowest (coolest) foot vote
   end if;
-  (rank, ranki) = Modelica.Math.Vectors.sort(LS_NOS, ascending=false);
+  (rank, ranki) = Modelica.Math.Vectors.sort(LS_NOS, ascending=false);  // sort votes in descending order (warmest -> coolest)
 
+  //Low Thermal Sensation sub-model check
+  LTSwarm = if (n_plus>=n_minus) then true else false;  // if more warm votes (LS>0) than cool votes, use LTS (warm) sub-model
+  LTScool = if (n_plus<n_minus) then true else false;   // if more cool votes (LS<0) than warm votes, use LTS (cool) sub-model
+  //High Thermal Sensation sub-model check
+  HTSwarm = if (rank[3] >= 2) then true else false;     // if third highest local sensation meets HTS threshold (LS>=+2), use HTS (warm) sub-model
+  HTScool = if (rank[12] <= -2) then true else false;   // if third lowest local sensation meets HTS threshold (LS<=-2), use HTS (cool) sub-model
+  //Note: triggering the HTS sub-model will superceed the LTS sub-model
 
-  //High Thermal Sensation Check
-  HTSwarm = if (rank[3] >= 2) then true else false;
-  HTScool = if (rank[12] <= -2) then true else false;
-
-  //Low Thermal Sensation Determination
-  LTSwarm = if (n_plus>=n_minus) then true else false;
-  LTScool = if (n_plus<n_minus) then true else false;
-
-  //Number of Sensation Votes to be counted in LTS model
-  if LTSwarm then
-  //Low Sensation (Warm)
-    for i in 1:14 loop
-      //Count first 3 votes
-      if (i<=3) then
-        LTS[i] = rank[i];
-        nLTS[i] = 1;
-      //Check remaining against validity criteria
-      elseif (rank[i] > (2 - (interval*(i-3)))) then
-        LTS[i] = rank[i];
-        nLTS[i] = 1;
+  //Number of local sensation votes to be counted in LTS sub-model
+  if LTSwarm then         //Low Thermal Sensation (warm) sub-model triggered
+    for i in 1:14 loop 
+      if (i<=3) then      //Automatically consider the 3 warmest local sensation values
+        LTS[i] = rank[i];    //add local sensation to array
+        nLTS[i] = 1;         //add 1 to the number of body segments which qualify
+      elseif (rank[i] > (2 - (interval*(i-3)))) then //Check remaining local sensations against validity criteria
+        LTS[i] = rank[i];    //add local sensation to array if they qualify
+        nLTS[i] = 1;         //add 1 to the number of body segments which qualify
       else
-        LTS[i] = 0;
-        nLTS[i] = 0;
+        LTS[i] = 0;          //add 0 to array elements which do not qualify
+        nLTS[i] = 0;         //add 0 to the number of body segments which qualify
       end if;
     end for;
-  //Low Sensation (Cool)
-  else
+
+  else                    //Low Thermal Sensation (cool) sub-model triggered
     for i in 1:14 loop
-      //Count first 3 votes
-      if (i<=3) then
-        LTS[i] = rank[15-i];
-        nLTS[i] = 1;
-      //Check remaining against validity criteria
-      elseif (rank[15-i] > (-2 + (interval*(i-3)))) then
-        LTS[i] = rank[15-i];
-        nLTS[i] = 1;
+      if (i<=3) then      //Automatically consider the 3 coolest local sensation values
+        LTS[i] = rank[15-i]; //add local sensation to array
+        nLTS[i] = 1;         //add 1 to the number of body segments which qualify
+      elseif (rank[15-i] > (-2 + (interval*(i-3)))) then  //Check remaining local sensations against validity criteria
+        LTS[i] = rank[15-i]; //add local sensation to array if they qualify
+        nLTS[i] = 1;         //add 1 to the number of body segments which qualify
       else
-        LTS[i] = 0;
-        nLTS[i] = 0;
+        LTS[i] = 0;          //add 0 to array elements which do not qualify
+        nLTS[i] = 0;         //add 0 to the number of body segments which qualify
       end if;
     end for;
+
   end if;
-  interval = 2/(np[1]-2);
+  interval = 2/(np[1]-2);  // counting interval for validity criteria
 
 
-  //No-Opposite-Sensation Model??
-  if No_Opposite_Sensation_Model then
+  //Overall Sensation Model
+  if No_Opposite_Sensation_Model then      // if n-o-s model has been triggered
 
-    //High Levels of Thermal Sensation??
-    if (HTSwarm or HTScool) then
-      OS = if HTSwarm then 0.5*rank[1] + 0.5*rank[3] else 0.38*rank[14] + 0.62*rank[12];
-
-    //Low Levels of Thermal Sensation
-    else
-      OS = sum(LTS)/sum(nLTS);
+    if (HTSwarm or HTScool) then           // check if HTS sub-model has been triggered
+      OS = if HTSwarm then 0.5*rank[1] + 0.5*rank[3] else 0.38*rank[14] + 0.62*rank[12];  // overall sensation is based on complaint model
+    else                                   // otherwise apply LTS sub-model
+      OS = sum(LTS)/sum(nLTS);             // overall sensation is the average of the qualifying local thermal sensations
     end if;
-
-    //tie up loose ends
+    //tie up loose ends (Modelica requires these variables to have an output or an error will be generated)
     OS_big = 0;
     OS_mod = 0;
     OSMwarm = false;
     OSMcool = false;
 
-  //Opposite-Sensation Model
-  else
-    //big group is warm side
-    if (n_plus>=n_minus) then
+  else                                     // if n-o-s model only conditions are not met then apply opposite sensation conditions
+                                             // determine which group of sensations are larger (warm sensations or cool sensations)
+    if (n_plus>=n_minus) then                // if the warm group is larger it becomes the 'big' group / main contributor
 
-      //check for dominant cooling
-      if ((LS[2]<=-1) or (LS[3]<=-1) or (LS[4]<=-1)) then
-        OS = min(LS[2],min(LS[3],LS[4]));
+      if ((LS[2]<=-1) or (LS[3]<=-1) or (LS[4]<=-1)) then //check for dominant cooling in the chest, back, or pelvis
+        OS = min(LS[2],min(LS[3],LS[4]));                 //overall sensation will be the lowest (most cool) value if this rule is triggered
+        //tie up loose ends
         OS_big = 0;
         OS_mod = 0;
         OSMwarm = false;
         OSMcool = false;
-      else
-
-        //big group calculation by no-opposite-sensation model
-        if HTSwarm then
-          OS_big = 0.5*rank[1] + 0.5*rank[3];
+      
+      else                                    //otherwise calculate main contribution using n-o-s methods
+        if HTSwarm then                       //check for high thermal sensations
+          OS_big = 0.5*rank[1] + 0.5*rank[3];   //if HTS then the main contribution to overall sensation is determined by HTS (warm) sub-model
         else
-          OS_big = sum(LTS)/sum(nLTS);
+          OS_big = sum(LTS)/sum(nLTS);          //otherwise the main contribution to overall sensation is determined by LTS (warm) sub-model
         end if;
 
+        OS_mod = iF_sort[16] + 0.1*iF_sort[15]; //modifying contribution is determined by the most negative individual forces
+        OS = OS_big + OS_mod;                   //overall sensation is the combination of the main and modifying contributions
+
+        //tie up loose ends
         OSMwarm = true;
         OSMcool = false;
-
-        //small group modifier
-        OS_mod = iF_sort[16] + 0.1*iF_sort[15];
-        OS = OS_big+OS_mod;
-
       end if;
 
-    //big group is cool side
-    else
-
-      //big group calculation by no-opposite-sensation model
-      if HTScool then
-        OS_big = 0.38*rank[14] + 0.62*rank[12];
+    else                                    // if the cool group is larger it becomes the 'big' group / main contributor
+      if HTScool then                       //check for high thermal sensations
+        OS_big = 0.38*rank[14] + 0.62*rank[12]; //if HTS then the main contribution to overall sensation is determined by HTS (cool) sub-model
       else
-        OS_big = sum(LTS)/sum(nLTS);
+        OS_big = sum(LTS)/sum(nLTS);            //otherwise the main contribution to overall sensation is determined by LTS (warm) sub-model
       end if;
 
+      OS_mod = iF_sort[1] + 0.1*iF_sort[2];     //modifying contribution is determined by the most positive individual forces
+      OS = OS_big + OS_mod;                     //overall sensation is the combination of the main and modifying contributions
+
+      //tie up loose ends
       OSMwarm = false;
       OSMcool = true;
-
-      //small group modifier
-      OS_mod = iF_sort[1] + 0.1*iF_sort[2];
-      OS = OS_big + OS_mod;
-
     end if;
-
-
   end if;
 
   //event operations
